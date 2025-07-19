@@ -7,57 +7,110 @@ export interface PriceData {
   priceBRL: number;
   priceUSD: number;
   lastUpdate: string;
+  preposition: string;
+  dailyChange: number;
+  unit: string;
 }
 
 function parsePrice(rawPrice: string): number {
-  const cleanedPrice = rawPrice.replace('R$', '').replace(/\u00A0/g, ' ').replace(',', '.').trim();
+  if (!rawPrice) return 0;
+  const cleanedPrice = rawPrice.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
   return parseFloat(cleanedPrice);
 }
 
-export async function GET() {
-  const url = 'https://www.cepea.esalq.usp.br/br/indicador/soja.aspx';
-  let browser;
+function parsePercentage(rawPercentage: string): number {
+  if (!rawPercentage) return 0;
+  const cleaned = rawPercentage.replace('%', '').replace(',', '.').trim();
+  return parseFloat(cleaned) || 0;
+}
 
+const commoditiesConfig = {
+  soja: {
+    url: 'https://www.cepea.esalq.usp.br/br/indicador/soja.aspx',
+    name: 'Soja',
+    tableId: '#imagenet-indicador1',
+    unit: 'por saca de 60kg',
+    preposition: 'da',
+  },
+  milho: {
+    url: 'https://www.cepea.esalq.usp.br/br/indicador/milho.aspx',
+    name: 'Milho',
+    tableId: '#imagenet-indicador1',
+    unit: 'por saca de 60kg',
+    preposition: 'do',
+  },
+  cafe: {
+    url: 'https://www.cepea.esalq.usp.br/br/indicador/cafe.aspx',
+    name: 'Café',
+    tableId: '#imagenet-indicador1',
+    unit: 'por saca de 60kg',
+    preposition: 'do',
+  },
+  trigo: {
+    url: 'https://www.cepea.esalq.usp.br/br/indicador/trigo.aspx',
+    name: 'Trigo',
+    tableId: '#imagenet-indicador2',
+    unit: 'por tonelada',
+    preposition: 'do',
+  },
+};
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const commodityKey = searchParams.get('commodity') || 'soja';
+
+  if (!(commodityKey in commoditiesConfig)) {
+    return new NextResponse('Commodity inválida', { status: 400 });
+  }
+
+  const key = commodityKey as keyof typeof commoditiesConfig;
+  const config = commoditiesConfig[key];
+  
+  let browser;
   try {
     browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36');
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(config.url, { waitUntil: 'networkidle2' });
     const html = await page.content();
     await browser.close();
 
     const $ = cheerio.load(html);
 
-    const priceRow = $('#imagenet-indicador1 tbody tr').first();
+    const priceRow = $(`${config.tableId} tbody tr`).first();
 
     if (priceRow.length === 0) {
-      throw new Error('Não foi possível encontrar a linha de dados na tabela de preços.');
+      throw new Error(`Tabela de preços com ID '${config.tableId}' não encontrada.`);
     }
-
+    
     const date = priceRow.find('td').eq(0).text().trim();
     const priceBRL_raw = priceRow.find('td').eq(1).text().trim();
-    const priceUSD_raw = priceRow.find('td').eq(4).text().trim();
+    const dailyChange_raw = priceRow.find('td').eq(2).text().trim();
+    let priceUSD_raw = priceRow.find('td').eq(4).text().trim();
+    
+    if (!priceUSD_raw) {
+      priceUSD_raw = priceRow.find('td').eq(3).text().trim();
+    }
 
-    if (!date || !priceBRL_raw || !priceUSD_raw) {
-      throw new Error('Uma das células de dados (data, R$ ou US$) não foi encontrada na linha.');
+    if (!date || !priceBRL_raw) {
+      throw new Error('Células de dados essenciais (data, R$) não foram encontradas.');
     }
 
     const priceData: PriceData = {
-      commodity: 'Soja',
+      commodity: config.name,
       priceBRL: parsePrice(priceBRL_raw),
       priceUSD: parsePrice(priceUSD_raw),
       lastUpdate: date,
+      preposition: config.preposition,
+      dailyChange: parsePercentage(dailyChange_raw),
+      unit: config.unit,
     };
     
-    return NextResponse.json(priceData, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=1800',
-      },
-    });
+    return NextResponse.json(priceData);
 
   } catch (error) {
     if (browser) await browser.close();
-    console.error('Erro no scraper de preços:', error);
-    return new NextResponse('Falha ao buscar os dados de cotação', { status: 500 });
+    console.error(`Erro no scraper de ${config.name}:`, error);
+    return new NextResponse(`Falha ao buscar dados para ${config.name}`, { status: 500 });
   }
 }

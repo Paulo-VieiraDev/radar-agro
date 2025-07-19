@@ -1,65 +1,138 @@
-// src/components/dashboard/PriceCard.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import type { PriceData } from "@/app/api/prices/route";
-import { TrendingUp } from "lucide-react";
+import { Loader2, Leaf, Wheat, Coffee, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
-async function getPriceData(): Promise<PriceData | null> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/prices`, {
-      next: { revalidate: 3600 }
-    });
+const commodities = [
+  { value: 'soja', label: 'Soja' },
+  { value: 'milho', label: 'Milho' },
+  { value: 'cafe', label: 'Café' },
+  { value: 'trigo', label: 'Trigo' },
+];
 
-    if (!response.ok) return null;
-    
-    return response.json();
-  } catch (error) {
-    console.error("Falha ao buscar dados de cotação no componente:", error);
-    return null;
+const getCommodityIcon = (commodityValue: string) => {
+  switch (commodityValue) {
+    case 'soja':
+      return <Leaf className="w-5 h-5 text-green-700" />;
+    case 'milho':
+      return <Wheat className="w-5 h-5 text-yellow-600" />;
+    case 'cafe':
+      return <Coffee className="w-5 h-5 text-amber-800" />;
+    case 'trigo':
+      return <Wheat className="w-5 h-5 text-amber-500" />;
+    default:
+      return null;
   }
-}
+};
 
-export async function PriceCard() {
-  const data = await getPriceData();
+export function PriceCard() {
+  const [selectedCommodity, setSelectedCommodity] = useState('soja');
+  const [data, setData] = useState<PriceData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!data) {
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/prices?commodity=${selectedCommodity}`);
+        if (!response.ok) throw new Error('Falha ao buscar dados');
+        const priceData: PriceData = await response.json();
+        setData(priceData);
+      } catch (error) {
+        console.error("Falha ao buscar dados de cotação:", error);
+        setData(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedCommodity]);
+
+  const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const renderDailyChange = (change: number) => {
+    if (typeof change !== 'number' || isNaN(change)) {
+      return null;
+    }
+
+    const isPositive = change > 0;
+    const isNegative = change < 0;
+    const isZero = change === 0;
+    const formattedChange = `${isPositive ? '+' : ''}${change.toFixed(2).replace('.', ',')}%`;
+
     return (
-      <Card>
-        <CardHeader><CardTitle>Cotações</CardTitle></CardHeader>
-        <CardContent><p>Não foi possível carregar os dados de cotação.</p></CardContent>
-      </Card>
+      <Badge 
+        className={cn(
+          "text-sm font-semibold",
+          isPositive && "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+          isNegative && "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+          isZero && "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+        )}
+      >
+        {isPositive && <ArrowUp className="h-4 w-4 mr-1" />}
+        {isNegative && <ArrowDown className="h-4 w-4 mr-1" />}
+        {isZero && <Minus className="h-4 w-4 mr-1" />}
+        {formattedChange}
+      </Badge>
     );
-  }
-
-  const brlFormatter = new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  });
-
-  const usdFormatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  });
+  };
 
   return (
-    <Card>
+    <Card className='bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800'>
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Cotação da {data.commodity}</span>
-          <TrendingUp className="w-5 h-5 text-green-500" />
+          <div className="flex items-center gap-2">
+            {getCommodityIcon(selectedCommodity)}
+            <span>Cotação {data?.preposition || 'da'} {data?.commodity || '...'}</span>
+          </div>
+          <Select value={selectedCommodity} onValueChange={setSelectedCommodity} disabled={isLoading}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Selecionar" />
+            </SelectTrigger>
+            <SelectContent>
+              {commodities.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="text-4xl font-bold">
-          {brlFormatter.format(data.priceBRL)}
-        </div>
-        <div className="text-lg text-muted-foreground">
-          {usdFormatter.format(data.priceUSD)}
-        </div>
+      <CardContent className="h-[125px] flex flex-col justify-center">
+        {isLoading ? (
+          <div className="flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+        ) : data ? (
+          <div className="space-y-1">
+            <div className="flex items-baseline gap-4">
+              <div>
+                <div className="text-4xl font-bold">
+                  {brlFormatter.format(data.priceBRL)}
+                </div>
+                <div className="text-sm text-muted-foreground -mt-1">
+                  {data.unit}
+                </div>
+              </div>
+              {renderDailyChange(data.dailyChange)}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-destructive">Erro ao carregar dados.</p>
+        )}
       </CardContent>
-      <CardFooter>
-        <p className="text-xs text-muted-foreground">
-          Última atualização: {data.lastUpdate} (Fonte: CEPEA)
-        </p>
+      <CardFooter className="flex justify-between text-xs text-muted-foreground">
+        <span>
+          {data ? `Atualizado: ${data.lastUpdate}` : ''}
+        </span>
+        <span className="font-semibold">
+          {data ? `$${data.priceUSD.toFixed(2)} / US$` : ''}
+        </span>
       </CardFooter>
     </Card>
   );

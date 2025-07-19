@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer'; 
+import puppeteer from 'puppeteer';
 
 export interface NewsArticle {
   title: string;
   link: string;
+  imageUrl: string | null;
+  tag: string | null;
 }
 
 export async function GET() {
@@ -12,6 +14,7 @@ export async function GET() {
   let browser;
 
   try {
+
     browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36');
@@ -22,33 +25,36 @@ export async function GET() {
     const $ = cheerio.load(html);
     const articles: NewsArticle[] = [];
 
-    $('ol.ultimas li').each((i, element) => {
-      if (i >= 5) {
-        return false;
-      }
+    const selector = 'div.noticias-em-destaque a.box-destaque, div.noticias-em-destaque div.caixa a';
 
-      const linkElement = $(element).find('a');
-      const title = linkElement.text().trim();
+    $(selector).each((i, element) => {
+
+      if (i >= 6) return false; 
+
+      const linkElement = $(element);
+
+      const title = linkElement.find('div.titulo, div.titulo-principal').text().trim();
       let link = linkElement.attr('href') || '';
+      let imageUrl = linkElement.find('img').attr('data-src') || linkElement.find('img').attr('src') || null;
+      const tag = linkElement.find('div.tag-not').text().trim() || null;
 
       if (link && !link.startsWith('http')) {
         link = baseUrl + link;
       }
+      if (imageUrl && !imageUrl.startsWith('http')) {
+        imageUrl = baseUrl + imageUrl;
+      }
 
       if (title && link) {
-        articles.push({ title, link });
+        articles.push({ title, link, imageUrl, tag });
       }
     });
 
     if (articles.length === 0) {
-      throw new Error('Nenhuma notícia encontrada. A estrutura do site pode ter mudado.');
+      throw new Error('Nenhuma notícia com imagem encontrada.');
     }
 
-    return NextResponse.json(articles, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=1800',
-      },
-    });
+    return NextResponse.json(articles);
 
   } catch (error) {
     if (browser) await browser.close();
