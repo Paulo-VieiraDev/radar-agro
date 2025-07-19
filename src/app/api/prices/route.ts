@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import puppeteer from 'puppeteer';
 
+export interface PriceHistory {
+  date: string;
+  price: number;
+}
+
 export interface PriceData {
   commodity: string;
   priceBRL: number;
@@ -10,6 +15,7 @@ export interface PriceData {
   preposition: string;
   dailyChange: number;
   unit: string;
+  history: PriceHistory[];
 }
 
 function parsePrice(rawPrice: string): number {
@@ -77,40 +83,47 @@ export async function GET(req: Request) {
 
     const $ = cheerio.load(html);
 
-    const priceRow = $(`${config.tableId} tbody tr`).first();
+    const history: PriceHistory[] = [];
+    const tableRows = $(`${config.tableId} tbody tr`);
 
-    if (priceRow.length === 0) {
-      throw new Error(`Tabela de preços com ID '${config.tableId}' não encontrada.`);
-    }
-    
-    const date = priceRow.find('td').eq(0).text().trim();
-    const priceBRL_raw = priceRow.find('td').eq(1).text().trim();
-    const dailyChange_raw = priceRow.find('td').eq(2).text().trim();
-    let priceUSD_raw = priceRow.find('td').eq(4).text().trim();
-    
-    if (!priceUSD_raw) {
-      priceUSD_raw = priceRow.find('td').eq(3).text().trim();
+    tableRows.each((index, row) => {
+      const cells = $(row).find('td');
+      const date = cells.eq(0).text().trim();
+      const priceBRL_raw = cells.eq(1).text().trim();
+      if (date && priceBRL_raw) {
+        history.push({
+          date: date.substring(0, 5),
+          price: parsePrice(priceBRL_raw),
+        });
+      }
+    });
+
+    if (history.length === 0) {
+      throw new Error('Não foi possível capturar o histórico de preços.');
     }
 
-    if (!date || !priceBRL_raw) {
-      throw new Error('Células de dados essenciais (data, R$) não foram encontradas.');
-    }
+    const latestPriceData = history[0];
+    const latestRow = tableRows.first();
+    const dailyChange_raw = latestRow.find('td').eq(2).text().trim();
+    let priceUSD_raw = latestRow.find('td').eq(4).text().trim();
+    if (!priceUSD_raw) priceUSD_raw = latestRow.find('td').eq(3).text().trim();
 
-    const priceData: PriceData = {
+    const responseData: PriceData = {
       commodity: config.name,
-      priceBRL: parsePrice(priceBRL_raw),
+      priceBRL: latestPriceData.price,
       priceUSD: parsePrice(priceUSD_raw),
-      lastUpdate: date,
+      lastUpdate: history[0].date,
       preposition: config.preposition,
       dailyChange: parsePercentage(dailyChange_raw),
       unit: config.unit,
+      history: history.reverse(),
     };
     
-    return NextResponse.json(priceData);
+    return NextResponse.json(responseData);
 
   } catch (error) {
     if (browser) await browser.close();
     console.error(`Erro no scraper de ${config.name}:`, error);
-    return new NextResponse(`Falha ao buscar dados para ${config.name}`, { status: 500 });
+    return new NextResponse(`Falha ao buscar os dados de cotação para ${config.name}`, { status: 500 });
   }
 }

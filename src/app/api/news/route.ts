@@ -14,7 +14,6 @@ export async function GET() {
   let browser;
 
   try {
-
     browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36');
@@ -28,11 +27,7 @@ export async function GET() {
     const selector = 'div.noticias-em-destaque a.box-destaque, div.noticias-em-destaque div.caixa a';
 
     $(selector).each((i, element) => {
-
-      if (i >= 6) return false; 
-
       const linkElement = $(element);
-
       const title = linkElement.find('div.titulo, div.titulo-principal').text().trim();
       let link = linkElement.attr('href') || '';
       let imageUrl = linkElement.find('img').attr('data-src') || linkElement.find('img').attr('src') || null;
@@ -50,11 +45,13 @@ export async function GET() {
       }
     });
 
-    if (articles.length === 0) {
+    const finalArticles = articles.slice(0, 6); 
+
+    if (finalArticles.length === 0) {
       throw new Error('Nenhuma notícia com imagem encontrada.');
     }
 
-    return NextResponse.json(articles);
+    return NextResponse.json(finalArticles);
 
   } catch (error) {
     if (browser) await browser.close();

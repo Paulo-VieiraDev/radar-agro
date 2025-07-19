@@ -2,58 +2,33 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Sun, Cloud, CloudRain, CloudSun, Wind, Droplets, AlertTriangle, Loader2 } from "lucide-react";
+import { Sun, Cloud, CloudRain, CloudSun, Wind, Droplets, AlertTriangle, Loader2, Thermometer } from "lucide-react";
 import type { WeatherData } from "@/app/api/weather/route";
 import { CityPreferenceDialog } from "./CityPreferenceDialog";
-import { useSession } from 'next-auth/react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
-const getWeatherIcon = (iconCode: string) => {
-  if (iconCode.includes("01")) return <Sun className="w-16 h-16 text-yellow-500" />;
-  if (iconCode.includes("02")) return <CloudSun className="w-16 h-16 text-gray-500" />;
-  if (iconCode.includes("03") || iconCode.includes("04")) return <Cloud className="w-16 h-16 text-gray-500" />;
-  if (iconCode.includes("09") || iconCode.includes("10")) return <CloudRain className="w-16 h-16 text-blue-500" />;
-  return <Sun className="w-16 h-16 text-yellow-500" />;
+const getWeatherIcon = (code: number, size: 'large' | 'small' = 'large') => {
+  const className = size === 'large' ? "w-24 h-24" : "w-6 h-6";
+  if ([0, 1].includes(code)) return <Sun className={`${className} text-yellow-500`} />;
+  if ([2].includes(code)) return <CloudSun className={`${className} text-gray-500`} />;
+  if ([3].includes(code)) return <Cloud className={`${className} text-gray-400`} />;
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return <CloudRain className={`${className} text-blue-500`} />;
+  return <Sun className={`${className} text-yellow-500`} />;
 };
 
-export function WeatherCard({ initialCity }: { initialCity: string | null }) {
-  const { data: session } = useSession();
-  const [city, setCity] = useState(initialCity || '');
+const getDayOfWeek = (dateString: string) => {
+  const date = new Date(dateString + 'T00:00:00');
+  return date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+};
+
+export function WeatherCard() {
+  const [city, setCity] = useState('Ivaiporã');
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!initialCity && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const response = await fetch(`/api/geocode/reverse?lat=${latitude}&lon=${longitude}`);
-            const data = await response.json();
-            if (data.city) {
-              setCity(data.city);
-            }
-          } catch (e) {
-            console.error("Erro ao buscar cidade por geolocalização", e);
-            setError("Não foi possível buscar sua cidade.");
-            setCity("Ivaiporã");
-          }
-        },
-        (geoError) => {
-          console.error("Permissão de geolocalização negada.", geoError);
-          setError("Localização negada. Mostrando clima para a cidade padrão.");
-          setCity("Ivaiporã");
-        }
-      );
-    }
-  }, [initialCity]);
-
-  useEffect(() => {
-    if (!city) {
-      if (!initialCity) setIsLoading(false);
-      return;
-    }
-
+    if (!city) return;
     const fetchWeatherData = async () => {
       setIsLoading(true);
       setError(null);
@@ -72,51 +47,86 @@ export function WeatherCard({ initialCity }: { initialCity: string | null }) {
         setIsLoading(false);
       }
     };
-
     fetchWeatherData();
   }, [city]);
 
+  const renderContent = () => {
+    if (isLoading) {
+      return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
+    if (error) {
+      return <div className="flex flex-col items-center justify-center text-center h-full text-destructive"><AlertTriangle className="w-10 h-10 mb-2" /><p className="font-semibold">{error}</p></div>;
+    }
+    if (weather) {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="flex-grow">
+            <div className="flex flex-col items-center">
+              <div className="flex items-center justify-center gap-4 w-full">
+                  {getWeatherIcon(weather.current.weather_code)}
+                  <div className="flex flex-col">
+                      <div className="text-7xl font-bold">{Math.round(weather.current.temp)}°C</div>
+                      <div className="text-lg text-muted-foreground capitalize -mt-1">{weather.description}</div>
+                  </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm mt-4">
+                  <div className="flex items-center"><Thermometer className="w-4 h-4 mr-1.5 text-red-500" /><span>Max: {Math.round(weather.forecast[0].temp_max)}°</span></div>
+                  <div className="flex items-center"><Droplets className="w-4 h-4 mr-1.5 text-blue-400" /><span>{weather.current.humidity}%</span></div>
+                  <div className="flex items-center"><Thermometer className="w-4 h-4 mr-1.5 text-blue-500" /><span>Min: {Math.round(weather.forecast[0].temp_min)}°</span></div>
+                  {typeof weather.current.wind_speed === 'number' && (
+                      <div className="flex items-center"><Wind className="w-4 h-4 mr-1.5 text-gray-400" /><span>{weather.current.wind_speed.toFixed(1)} km/h</span></div>
+                  )}
+              </div>
+            </div>
+            <div className="w-full h-24 mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weather.hourly} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="temp" stroke="#8884d8" fill="url(#colorTemp)" />
+                  <XAxis dataKey="time" fontSize={12} tickLine={false} axisLine={false} interval={5} />
+                  <YAxis domain={['dataMin - 2', 'dataMax + 2']} hide />
+                  <Tooltip 
+                    formatter={(value: number) => [value.toFixed(1) + '°C', 'Temp.']}
+                    labelStyle={{ fontSize: 12 }}
+                    contentStyle={{ fontSize: 14, border: 'none', borderRadius: '0.5rem', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="w-full pt-4 border-t">
+            <div className="grid grid-cols-7 gap-1 text-center text-sm">
+              {weather.forecast.map(day => (
+                <div key={day.date} className="flex flex-col items-center p-1 rounded-md">
+                  <span className="font-semibold uppercase">{getDayOfWeek(day.date)}</span>
+                  {getWeatherIcon(day.weather_code, 'small')}
+                  <div className="flex items-center text-xs"><Thermometer className="w-3 h-3 mr-1 text-red-500" /><span>{Math.round(day.temp_max)}°</span></div>
+                  <div className="flex items-center text-xs text-muted-foreground"><Thermometer className="w-3 h-3 mr-1 text-blue-500" /><span>{Math.round(day.temp_min)}°</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <Card className="bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-gray-800">
+    <Card className="flex flex-col">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Clima em {weather?.city || city || 'Buscando...'}</span>
-          {session && <CityPreferenceDialog currentCity={city} />}
+          <span>Clima em {city}</span>
+          <CityPreferenceDialog currentCity={city} onCityChange={setCity} />
         </CardTitle>
       </CardHeader>
-      <CardContent className="h-[150px] flex flex-col justify-center">
-        {isLoading ? (
-          <div className="flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center text-center text-destructive">
-            <AlertTriangle className="w-10 h-10 mb-2" />
-            <p className="font-semibold">Erro ao carregar</p>
-            <p className="text-sm">{error}</p>
-          </div>
-        ) : weather ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center space-x-6">
-              {getWeatherIcon(weather.icon)}
-              <div className="text-6xl font-bold">{Math.round(weather.temp)}°C</div>
-            </div>
-            <div className="flex justify-around text-center">
-              <div className="flex items-center space-x-2">
-                <Droplets className="w-5 h-5 text-blue-400"/>
-                <div>
-                  <p className="font-semibold">{weather.humidity}%</p>
-                  <p className="text-xs text-muted-foreground">Umidade</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Wind className="w-5 h-5 text-gray-400"/>
-                <div>
-                  <p className="font-semibold">{(weather.wind_speed * 3.6).toFixed(1)} km/h</p>
-                  <p className="text-xs text-muted-foreground">Vento</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
+      <CardContent className="flex-grow flex flex-col justify-center">
+        {renderContent()}
       </CardContent>
     </Card>
   );

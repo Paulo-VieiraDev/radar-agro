@@ -12,18 +12,9 @@ interface NewsArticle {
   tag: string | null;
 }
 
-const NewsTag = ({ tag }: { tag: string | null }) => {
-  if (!tag) return null;
-  return (
-    <div className="absolute top-2 right-2 bg-white text-xs font-semibold px-2 py-1 rounded z-10 shadow-md">
-      {tag}
-    </div>
-  );
-};
-
-const NewsItem = ({ article, isLarge = false }: { article: NewsArticle, isLarge?: boolean }) => (
+const NewsItem = ({ article }: { article: NewsArticle }) => (
   <a href={article.link} target="_blank" rel="noopener noreferrer" 
-     className="relative block w-full h-full group rounded-lg overflow-hidden shadow-md">
+     className="relative block w-full h-full group rounded-lg overflow-hidden shadow-md min-h-[180px]">
     {article.imageUrl ? (
       <Image 
         src={article.imageUrl} 
@@ -36,13 +27,12 @@ const NewsItem = ({ article, isLarge = false }: { article: NewsArticle, isLarge?
         <span className="text-slate-500 text-center text-sm">{article.title}</span>
       </div>
     )}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-    <div className="absolute bottom-0 p-3 text-white">
-      <h3 className={isLarge ? "text-lg font-bold group-hover:underline" : "text-sm font-semibold group-hover:underline"}>
+    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+    <div className="absolute bottom-0 p-3 text-white w-full">
+      <h3 className="font-semibold group-hover:underline leading-tight">
         {article.title}
       </h3>
     </div>
-    <NewsTag tag={article.tag} />
   </a>
 );
 
@@ -67,9 +57,6 @@ export function NewsCard() {
     fetchNews();
   }, []);
 
-  const topArticles = articles.slice(0, 2);
-  const bottomArticles = articles.slice(2, 6);
-
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
@@ -84,17 +71,11 @@ export function NewsCard() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="flex flex-col h-full gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow min-h-[200px]">
-              {topArticles.map((article, index) => (
-                <NewsItem key={index} article={article} isLarge={true} />
-              ))}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 h-[180px]">
-              {bottomArticles.map((article, index) => (
-                <NewsItem key={index} article={article} />
-              ))}
-            </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
+            {articles.map((article, index) => (
+              <NewsItem key={index} article={article} />
+            ))}
           </div>
         )}
       </CardContent>
