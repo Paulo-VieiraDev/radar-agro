@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Radar Agro 🛰️🌾
 
-## Getting Started
+Um dashboard dinâmico e responsivo focado no agronegócio brasileiro, fornecendo dados em tempo real sobre cotações, clima e notícias. Este projeto foi construído com Next.js e utiliza técnicas de web scraping para agregar informações de fontes públicas em uma interface limpa, moderna e profissional.
 
-First, run the development server:
+## ➤ Principais Funcionalidades
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+O dashboard é composto por três cards principais, cada um com funcionalidades ricas e interativas:
+
+#### 📊 Card de Cotações
+- **Filtro Interativo:** Permite ao usuário selecionar e visualizar em tempo real a cotação de múltiplas commodities (Soja, Milho, Café, Trigo).
+- **Variação Diária:** Exibe a variação percentual do dia com cores e ícones (▲ verde para alta, ▼ vermelho para baixa), fornecendo um feedback visual instantâneo sobre o mercado.
+- **Gráfico de Histórico:** Apresenta um gráfico de linha com o histórico de preços dos últimos ~15 dias, utilizando a biblioteca Recharts para uma visualização de dados elegante.
+- **Unidades Claras:** Mostra o preço e a unidade correspondente (ex: "por saca de 60kg", "por tonelada") para evitar ambiguidades.
+
+#### ☀️ Card de Clima
+- **Seletor de Cidade Manual:** Qualquer usuário pode alterar a cidade para a qual deseja ver a previsão do tempo através de um diálogo simples.
+- **Gráfico de Previsão Horária:** Um gráfico de área exibe a previsão de temperatura para as próximas 24 horas, preenchendo o espaço do card de forma útil e bonita.
+- **Previsão para 7 Dias:** Na parte inferior do card, uma previsão concisa para a semana inteira é exibida, com dia da semana, ícone do tempo e temperaturas máxima e mínima.
+- **API Confiável:** Utiliza a API gratuita e sem chave do Open-Meteo para garantir alta disponibilidade e velocidade dos dados.
+
+#### 📰 Card de Notícias
+- **Layout Profissional:** Exibe as 6 notícias mais recentes em um layout de grid responsivo (3x2 no desktop, 2x3 em tablets, 1x6 em celulares), inspirado em portais de notícias modernos.
+- **Conteúdo Rico:** O scraper busca o título, o link, a imagem principal e a tag de categoria de cada notícia.
+- **Design "Mobile-First":** As tags de categoria são ocultadas e os títulos diminuem em telas menores para garantir uma experiência de leitura limpa e sem sobrecarga de informação.
+
+## 🚀 Stack Tecnológica
+
+O projeto foi construído com um conjunto de tecnologias modernas e robustas, focando em performance, tipagem segura e uma ótima experiência de desenvolvimento.
+
+- **Framework:** **Next.js 14+** (com App Router)
+- **Linguagem:** **TypeScript**
+- **Estilização:** **Tailwind CSS**
+- **Componentes UI:** **shadcn/ui**
+- **Gráficos:** **Recharts**
+- **Backend (API Routes):**
+  - **Web Scraping:** **Puppeteer** (para robustez) + **Cheerio** (para análise de HTML)
+  - **Fontes de Dados:** CEPEA/ESALQ/USP (Cotações), Notícias Agrícolas (Notícias), Open-Meteo (Clima).
+
+## 🏁 Como Começar
+
+Siga os passos abaixo para executar o projeto localmente.
+
+1.  **Clone o repositório:**
+    ```bash
+    git clone https://github.com/Paulo-VieiraDev/radar-agro.git
+    cd radar-agro
+    ```
+
+2.  **Instale as dependências:**
+    ```bash
+    npm install
+    ```
+
+3.  **Variáveis de Ambiente:**
+    Este projeto foi refatorado para não necessitar de chaves de API em um arquivo `.env`. Todas as fontes de dados são públicas.
+
+4.  **Execute o servidor de desenvolvimento:**
+    ```bash
+    npm run dev
+    ```
+
+5.  Abra [http://localhost:3000](http://localhost:3000) no seu navegador para ver o resultado.
+
+## 🏗️ Estrutura do Projeto
+
+A estrutura de pastas segue as convenções do Next.js App Router:
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+/
+├── public/
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── news/
+│   │   │   │   └── route.ts
+│   │   │   ├── prices/
+│   │   │   │   └── route.ts 
+│   │   │   └── weather/
+│   │   │       └── route.ts  
+│   │   ├── page.tsx            
+│   │   └── layout.tsx           
+│   ├── components/
+│   │   ├── dashboard/
+│   │   │   ├── NewsCard.tsx
+│   │   │   ├── PriceCard.tsx
+│   │   │   └── WeatherCard.tsx
+│   │   └── ui/                
+│   └── lib/
+│       └── utils.ts          
+├── next.config.ts
+└── ...
+```
